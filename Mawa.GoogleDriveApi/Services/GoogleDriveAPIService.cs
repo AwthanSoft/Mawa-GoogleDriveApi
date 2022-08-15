@@ -1,354 +1,53 @@
-﻿using Google.Apis.Auth.OAuth2;
-using Google.Apis.Drive.v3;
-using Google.Apis.Services;
-using Google.Apis.Util.Store;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-using AppMe.Internet;
-using AppMe.GoogleDriveApi.Services;
-using AppMe.ClassCtrl;
-using AppMe.GoogleDriveApi.Helpers;
+using Mawa.GoogleDriveApi.Configs;
+using Mawa.Lock;
+using Mawa.GoogleDriveApi.Controls;
+using AppMe.DriveFiling.Models;
 
-using LangResources = AppMe.GoogleDriveApi.Resxes.GoogleDriveAppResource;
-using Mawa.AppBase.Info;
+using DriveFile = Google.Apis.Drive.v3.Data.File;
+using Mawa.GoogleDriveApi.Exceptions;
+using AppMe.DriveFiling.Extensions;
 
 namespace Mawa.GoogleDriveApi.Services
 {
     public interface IGoogleDriveAPIService
     {
-
-    }
-
-    public class GoogleDriveAPIService : SaveCtrlLockerCore, IGoogleDriveAPIService
-    {
-        #region statics
-
-        const string Folder_MimeType = "application/vnd.google-apps.folder";
-
-        #endregion
-
-
-        #region Initial
-
-        readonly IGoogleDriveApiConfigurationService ConfigurationService;
+        #region Folders
 
         /// <summary>
-        /// Права
+        /// to check is folder ixist in specify folder.
         /// </summary>
-        static string[] Scopes = { 
-            //DriveService.Scope.Drive, 
-            //DriveService.Scope.DriveReadonly,
-            DriveService.Scope.DriveFile,
-        };
-        static readonly string ApplicationName = AppInfo.ProductName;
-
-        private Lazy<DriveService> _service;
-        internal DriveService Service
-        {
-            get
-            {
-                if (_service == null)
-                {
-                    _service = new Lazy<DriveService>(GetGoogleAPI);
-                    return null;
-                }
-                return _service.Value;
-            }
-        }
-
-
-        public GoogleDriveAPIController(IGoogleDriveApiConfigurationService ConfigurationService)
-        {
-            this.ConfigurationService = ConfigurationService;
-            //service = GetGoogleAPI();
-            _service = new Lazy<DriveService>(GetGoogleAPI);
-        }
-
-
-        #endregion
-
-        #region Credential
+        /// <param name="FolderName">Folder Name that need to check</param>
+        /// <param name="parentsId">Parent Folder Id that will searched in</param>
+        /// <returns>Return Folder Id if exist or null</returns>
+        Task<string> IsFolderExist_InParentAsync(string FolderName, string parentsId);
+        Task<string> IsFolderExist_InParentAsync(string FolderName, string parentsId, CancellationToken cancellationToken);
 
         /// <summary>
-        /// Выполняет авторизацию пользователя
+        /// Create Folder in specify directory.
         /// </summary>
-        /// <returns></returns>
-        /// 
-        public UserCredential GoogleAuthorize() => ExcuteInSaveLocker(()=> _GoogleAuthorize());
+        /// <param name="FolderName">new folder name</param>
+        /// <param name="parentsId">parent folder id</param>
+        /// <returns>new folder id</returns>
+        Task<string> CreateFolderAsync(string FolderName, string parentsId);
+        Task<string> CreateFolderAsync(string FolderName, string parentsId, CancellationToken cancellationToken);
 
-        UserCredential _GoogleAuthorize()
-        {
-            UserCredential credential;
-            using (var stream = new FileStream(ConfigurationService.GoogleApiCredintial_FullPath, FileMode.Open, FileAccess.Read))
-            {
-                // The file token.json stores the user's access and refresh tokens, and is created
-                // automatically when the authorization flow completes for the first time.
-                credential = GoogleWebAuthorizationBroker.AuthorizeAsync(
-                    //GoogleClientSecrets.Load(stream).Secrets,
-                    GoogleClientSecrets.FromStream(stream).Secrets,
-                    //Scopes,
-                    ConfigurationService.Scopes,
-                    "user",
-                    CancellationToken.None,
-                    new FileDataStore(ConfigurationService.GoogleApiToken_SavedFullPath, true)).Result;
-
-                //Console.WriteLine("Credential file saved to: " + credPath);
-            }
-
-            return credential;
-        }
-
-        /// <summary>
-        /// Создает подключение к Google Drive используя API
-        /// </summary>
-        /// <returns>Возвращает инициализированный объект сервиса</returns>
-        private DriveService GetGoogleAPI()
-        {
-            //try
-            //{
-            //    // Create Drive API service.
-            //    return new DriveService(new BaseClientService.Initializer()
-            //    {
-            //        HttpClientInitializer = GoogleAuthorize(),
-            //        ApplicationName = ApplicationName,
-            //    });
-            //}
-            //catch (Exception ex)
-            //{
-            //    GoogleDriveApi_Helper.MssgShow_Error_LoadingSettings(ex.ToString());
-            //}
-
-            // Create Drive API service.
-            return new DriveService(new BaseClientService.Initializer()
-            {
-                HttpClientInitializer = GoogleAuthorize(),
-                ApplicationName = ApplicationName,
-            });
-        }
+        Task<DriveFile[]> GetFolders_InParentAsync(string parentsId, CancellationToken cancellationToken);
+        Task<DriveFile[]> GetFolders_InParentAsync(string parentsId);
 
         #endregion
 
+        #region Files
 
-        #region Accessing
+        //
+        Task<DriveFile[]> GetFiles_InParentAsync(string parentsId, CancellationToken cancellationToken);
+        Task<DriveFile[]> GetFiles_InParentAsync(string parentsId);
 
-        public async Task<bool> AccessServiceAsync()
-        {
-            bool resultt = false;
-            if (NetConnectionHelper.IsNetConnected())
-            {
-                if (Service != null)
-                {
-                    var ApiKey =  Service.ApiKey;
-                    try
-                    {
-                        if (await GetServiceAbout() != null)
-                        {
-                            resultt = true;
-                        }
-                        else
-                        {
-
-                        }
-                    }
-                    catch(Exception ex)
-                    {
-                        _service = new Lazy<DriveService>(GetGoogleAPI);
-                        throw ex;
-                    }
-                    
-                }
-                else
-                {
-                    GoogleDriveApi_ExceptionsHelper.Exception_ServicesIsNull();
-                }
-            }
-            else
-            {
-                NetConnectionHelper.Exception_NetNoConnected();
-            }
-            return resultt;
-        }
-
-        #endregion
-
-
-
-
-
-
-
-        #region Service Operations Me
-
-        public async Task<Google.Apis.Drive.v3.Data.About> GetServiceAbout()
-        {
-            var aboutRequest = Service.About.Get();
-            aboutRequest.Fields = "*";//will be heavy for App
-            //aboutRequest.Fields = "kind";
-
-            var requestResultt = await aboutRequest.ExecuteAsync();
-            if (requestResultt != null)
-            {
-
-            }
-            else
-            {
-
-            }
-            return requestResultt;
-        }
-
-
-        #endregion
-
-
-
-        #region Files Operations Me
-
-        public async Task<Google.Apis.Drive.v3.Data.File[]> Get_Files_InParentAsync(string parentsId = "root")
-        {
-            FilesResource.ListRequest listRequest = Service.Files.List();
-
-            listRequest.Q = $"'{parentsId}' in parents and mimeType !=  '{Folder_MimeType}' and trashed = false";
-            //listRequest.Fields = "nextPageToken, files(id, name, mimeType, trashed)";
-            listRequest.Fields = "nextPageToken, files(*)";
-            //listRequest.PageSize = 10;
-
-            IList<Google.Apis.Drive.v3.Data.File> folders = (await listRequest.ExecuteAsync()).Files;
-            return folders.ToArray();
-        }
-        
-        public Google.Apis.Drive.v3.Data.File UploadFileToDrive(
-            string filePact, string mimeType, string parent)
-        {
-            var fileMetadata = new Google.Apis.Drive.v3.Data.File()
-            {
-                Name = filePact.Split('\\').Last(),
-                MimeType = mimeType,
-                Parents = new List<string>() { parent }
-            };
-
-            FilesResource.CreateMediaUpload request;
-
-            using (var stream = new System.IO.FileStream(filePact, System.IO.FileMode.Open))
-            {
-                request = Service.Files.Create(fileMetadata, stream, mimeType);
-                request.Fields = "id, name, size";
-                request.Upload();
-                stream.Close();
-            }
-
-            return request.ResponseBody;
-
-            //try
-            //{
-            //    Console.WriteLine($"\tФайл загружен: {file.Name} \tразмер файла {file.Size / 1024} КБ");
-            //}
-            //catch (Exception ex)
-            //{
-            //    Console.WriteLine(ex.Message);
-            //}
-        }
-
-        public async Task<Google.Apis.Drive.v3.Data.File> UploadFileToDriveAsync(
-           string filePact, string mimeType, string parent)
-        {
-            var fileMetadata = new Google.Apis.Drive.v3.Data.File()
-            {
-                Name = filePact.Split('\\').Last(),
-                MimeType = mimeType,
-                Parents = new List<string>() { parent }
-            };
-
-            FilesResource.CreateMediaUpload request;
-
-            using (var stream = new System.IO.FileStream(filePact, System.IO.FileMode.Open))
-            {
-                request = Service.Files.Create(fileMetadata, stream, mimeType);
-                request.Fields = "id, name, size";
-                await request.UploadAsync();
-                stream.Close();
-            }
-
-            return request.ResponseBody;
-        }
-
-        public async Task<Google.Apis.Drive.v3.Data.File> UploadLargeFileToDriveAsync(
-          string filePact, string mimeType, string parent,
-          Func<bool> IsResumeng_Predicate,
-          Action<Google.Apis.Upload.IUploadProgress> ProgressChanged_Action
-          )
-        {
-            var fileMetadata = new Google.Apis.Drive.v3.Data.File()
-            {
-                Name = filePact.Split('\\').Last(),
-                MimeType = mimeType,
-                Parents = new List<string>() { parent }
-            };
-
-            FilesResource.CreateMediaUpload request;
-
-            bool isResumModel = false;
-            using (var stream = new System.IO.FileStream(filePact, System.IO.FileMode.Open))
-            {
-                request = Service.Files.Create(fileMetadata, stream, mimeType);
-                request.Fields = "id, name, size";
-                request.ProgressChanged += ProgressChanged_Action;
-
-                //request.ChunkSize = 1024;
-
-                while (true)
-                {
-                    try
-                    {
-                        if (isResumModel)
-                        {
-                            await request.ResumeAsync();
-                            break;
-                        }
-                        else
-                        {
-                            isResumModel = true;
-                            await request.UploadAsync();
-                            break;
-                        }
-                    }
-                    catch(Exception ex)
-                    {
-                        if(IsResumeng_Predicate())
-                        {
-                            continue;
-                        }
-                        else
-                        {
-                            throw ex;
-                        }
-                    }
-                }
-                
-                request.ProgressChanged -= ProgressChanged_Action;
-                stream.Close();
-            }
-
-            return request.ResponseBody;
-        }
-
-
-        public async Task<Google.Apis.Drive.v3.Data.File[]> Get_AllFilesAsync()
-        {
-            FilesResource.ListRequest listRequest = Service.Files.List();
-
-            listRequest.Q = $"mimeType !=  '{Folder_MimeType}' and trashed = false";
-            listRequest.Fields = "nextPageToken, files(id, size, name, mimeType, md5Checksum, parents)";
-            //listRequest.PageSize = 10;
-
-            IList<Google.Apis.Drive.v3.Data.File> files = (await listRequest.ExecuteAsync()).Files;
-            return files.ToArray();
-        }
 
         /// <summary>
         /// Copy an existing file.
@@ -357,305 +56,391 @@ namespace Mawa.GoogleDriveApi.Services
         /// <param name="originFileId">ID of the origin file to copy.</param>
         /// <param name="copyTitle">Title of the copy.</param>
         /// <returns>The copied file, null is returned if an API error occurred</returns>
-        public async Task<Google.Apis.Drive.v3.Data.File> CopyFileAsync(String originFileId, String copyTitle, string toFolderId)
-        {
-            var copiedFile = new Google.Apis.Drive.v3.Data.File();
-            copiedFile.Name = copyTitle;
-            copiedFile.Parents = new List<string>()
-            {
-                toFolderId
-            };
+        Task<DriveFile> CopyFileAsync(String originFileId, String copyTitle, string toFolderId, CancellationToken cancellationToken);
 
-            return await Service.Files.Copy(copiedFile, originFileId).ExecuteAsync();
+
+        Task<DriveFile> UploadLargeFileToDriveAsync(string filePact, string mimeType, string parent,
+            Func<bool> IsResumeng_Predicate,
+            Action<Google.Apis.Upload.IUploadProgress> ProgressChanged_Action,
+            CancellationToken cancellationToken);
+
+
+        #endregion
+
+        Task<bool> AccessServiceAsync();
+        Task<bool> AccessServiceAsync(CancellationToken cancellationToken);
+
+
+        #region Drive (Folders & Files) Helper
+
+        //
+        Task<FolderDriveStructFile[]> GetFolders_inFolderAsync(string folderId, CancellationToken cancellationToken);
+        //Recursion
+        Task<FolderDriveStructFile[]> GetFolders_inFolder_WithSubsAsync(string folderId, CancellationToken cancellationToken);
+
+
+        //GetFiles in Folder
+        Task<FileDriveStructFile[]> GetFiles_inFolderAsync(string folderId, CancellationToken cancellationToken);
+        //Task<FileDriveStructFile[]> GetFiles_inFolderAsync(string folderId);
+
+
+        //
+        Task<FileDriveStructFile[]> GetAllExistFilesInDriveAsync(CancellationToken cancellationToken);
+        //Task<FileDriveStructFile[]> GetAllExistFilesInDriveAsync();
+
+
+        //
+        Task<FolderDriveStructFile> LoadFolder_asStructAsync(string folderId, bool withSubFolder, bool withFiles, CancellationToken cancellationToken);
+
+        #endregion
+    }
+
+    class GoogleDriveAPIService : AppMe.IDisposableMe.DisposableMeCore, IGoogleDriveAPIService
+    {
+        #region Initial
+
+        readonly IGoogleDriveApiConfiguration Config;
+
+        private readonly ObjectLock objectLock;
+        public GoogleDriveAPIService(IGoogleDriveApiConfiguration Config)
+        {
+            this.Config = Config;
+            this.objectLock = new ObjectLock();
+
+            pre_initial();
+        }
+
+        private void pre_initial()
+        {
+            pre_initial_DriveApiService();
+
         }
 
 
+        #endregion
+
+        #region DriveApiService
+
+        private Lazy<GoogleDriveAPICtrl> __apiCtrl;
+        private GoogleDriveAPICtrl _apiCtrl => __apiCtrl.Value;
+        private void pre_initial_DriveApiService()
+        {
+
+        }
+
+        #endregion
+
+
+        #region Folders 
+
+        //
+        public Task<string> IsFolderExist_InParentAsync(string FolderName, string parentsId, CancellationToken cancellationToken)
+        {
+            //try
+            //{
+            //    objectLock.open_lock();
+            //}
+            //catch (Exception)
+            //{
+            //    objectLock.close_lock();
+            //    throw;
+            //}
+            //objectLock.close_lock();
+            return _IsFolderExist_InParentAsync(FolderName, parentsId, cancellationToken);
+        }
+        public Task<string> IsFolderExist_InParentAsync(string FolderName, string parentsId)
+        {
+            return _IsFolderExist_InParentAsync(FolderName, parentsId, CancellationToken.None);
+        }
+        Task<string> _IsFolderExist_InParentAsync(string FolderName, string parentsId, CancellationToken cancellationToken)
+        {
+            return _apiCtrl.IsExist_Folder_InParentAsync(FolderName, parentsId, cancellationToken);
+        }
+
+
+        //
+        public Task<string> CreateFolderAsync(string FolderName, string parentsId, CancellationToken cancellationToken)
+        {
+            return _CreateFolderAsync(FolderName, parentsId, cancellationToken);
+        }
+        public Task<string> CreateFolderAsync(string FolderName, string parentsId)
+        {
+            return _CreateFolderAsync(FolderName, parentsId, CancellationToken.None);
+        }
+        Task<string> _CreateFolderAsync(string FolderName, string parentsId, CancellationToken cancellationToken)
+        {
+            return _apiCtrl.CreateFolderAsync(FolderName, parentsId, cancellationToken);
+        }
+
+
+        //
+        public Task<DriveFile[]> GetFolders_InParentAsync(string parentsId, CancellationToken cancellationToken)
+        {
+            return _GetFolders_InParentAsync(parentsId, cancellationToken);
+        }
+        public Task<DriveFile[]> GetFolders_InParentAsync(string parentsId)
+        {
+            return _GetFolders_InParentAsync(parentsId, CancellationToken.None);
+        }
+        Task<DriveFile[]> _GetFolders_InParentAsync(string parentsId, CancellationToken cancellationToken)
+        {
+            return _apiCtrl.Get_Folders_InParentAsync(parentsId, cancellationToken);
+        }
+
+        #endregion
+
+
+        #region Files
+
+        //
+        public Task<DriveFile[]> GetFiles_InParentAsync(string parentsId, CancellationToken cancellationToken)
+        {
+            return _GetFiles_InParentAsync(parentsId, cancellationToken);
+        }
+        public Task<DriveFile[]> GetFiles_InParentAsync(string parentsId)
+        {
+            return _GetFiles_InParentAsync(parentsId, CancellationToken.None);
+        }
+        Task<DriveFile[]> _GetFiles_InParentAsync(string parentsId, CancellationToken cancellationToken)
+        {
+            return _apiCtrl.Get_Files_InParentAsync(parentsId, cancellationToken);
+        }
+
+
+        //
+        public Task<DriveFile> CopyFileAsync(String originFileId, String copyTitle, string toFolderId, CancellationToken cancellationToken)
+        {
+            return _CopyFileAsync(originFileId, copyTitle, toFolderId, cancellationToken);
+        }
+        Task<DriveFile> _CopyFileAsync(String originFileId, String copyTitle, string toFolderId, CancellationToken cancellationToken)
+        {
+            return _apiCtrl.CopyFileAsync(originFileId, copyTitle, toFolderId, cancellationToken);
+        }
+        
+        
+        //
+        public Task<DriveFile> UploadLargeFileToDriveAsync(string filePact, string mimeType, string parent,
+         Func<bool> IsResumeng_Predicate,
+         Action<Google.Apis.Upload.IUploadProgress> ProgressChanged_Action,
+         CancellationToken cancellationToken)
+        {
+            return _UploadLargeFileToDriveAsync(filePact, mimeType, parent, IsResumeng_Predicate, ProgressChanged_Action, cancellationToken);
+        }
+        Task<DriveFile> _UploadLargeFileToDriveAsync(string filePact, string mimeType, string parent,
+            Func<bool> IsResumeng_Predicate,
+            Action<Google.Apis.Upload.IUploadProgress> ProgressChanged_Action,
+            CancellationToken cancellationToken)
+        {
+            return _apiCtrl.UploadLargeFileToDriveAsync(filePact, mimeType, parent, IsResumeng_Predicate, ProgressChanged_Action, cancellationToken);
+
+        }
 
 
         #endregion
 
 
-        #region Folder operations Me
+        #region Drive (Folders & Files) Helper
 
-        /// <summary>
-        /// to check is folder ixist in specify folder.
-        ///For Quota 
-        ///https://developers.google.com/drive/api/v3/search-files
-        ///https://medium.com/@SandeepDinesh/copying-google-drive-folders-with-the-google-drive-api-3473f09d4f3d
-        ///For Fields
-        ///https://developers.google.com/drive/api/v3/reference/files
-        /// </summary>
-        /// <param name="name">Folder Name that need to check</param>
-        /// <param name="parentsId">Parent Folder Id that will searched in</param>
-        /// <returns>Return Folder Id if exist or null</returns>
-        public async Task<string> IsExist_Folder_InParentAsync(string name, string parentsId = "root")
+        //OneFolder 
+        public Task<FolderDriveStructFile[]> GetFolders_inFolderAsync(string folderId, CancellationToken cancellationToken)
         {
-            string resultt = null;
-            FilesResource.ListRequest listRequest = Service.Files.List();
-
-            //For Quota 
-            //https://developers.google.com/drive/api/v3/search-files
-            //https://medium.com/@SandeepDinesh/copying-google-drive-folders-with-the-google-drive-api-3473f09d4f3d
-            //For Fields
-            //https://developers.google.com/drive/api/v3/reference/files
-            //`'${from.id}' in parents and mimeType =  'application/vnd.google-apps.folder' and trashed = false`
-            //listRequest.Q = $"'${parentsId}' in parents and mimeType =  'application/vnd.google-apps.folder' and trashed = false";
-            listRequest.Q = $"'{parentsId}' in parents and mimeType = '{Folder_MimeType}' and trashed = false";
-            listRequest.Fields = "nextPageToken, files(id, name)";
-            //listRequest.PageSize = 10;
             //try
+            //{
+            //    objectLock.open_lock();
+            //}
+            //catch (Exception)
+            //{
+            //    objectLock.close_lock();
+            //    throw;
+            //}
+            //objectLock.close_lock();
+            return _GetFolders_inFolderAsync(folderId, cancellationToken);
+        }
+        async Task<FolderDriveStructFile[]> _GetFolders_inFolderAsync(string folderId, CancellationToken cancellationToken)
+        {
+            var temp_list = new List<FolderDriveStructFile>();
+            var RootFolders = await _apiCtrl.Get_Folders_InParentAsync(folderId, cancellationToken);
+            foreach (var file in RootFolders)
             {
-                IList<Google.Apis.Drive.v3.Data.File> folders = (await listRequest.ExecuteAsync()).Files;
-                var folder = folders.Where(b => b.Name.Equals(name)).FirstOrDefault();
-                if (folder != null)
+                var sub = new FolderDriveStructFile()
                 {
-                    resultt = folder.Id;
+                    DriveFileId = file.Id,
+                    ParentDriveId = folderId,
+                    Name = file.Name,
+                    DriveSize = (file.Size != null) ? file.Size.Value : 0,
+                    MimeType = file.MimeType,
+                    IsInDrive = true
+
+                };
+                temp_list.Add(sub);
+            }
+            return temp_list.ToArray();
+        }
+        //Recursion
+        public Task<FolderDriveStructFile[]> GetFolders_inFolder_WithSubsAsync(string folderId, CancellationToken cancellationToken)
+        {
+            return _GetFolders_inFolder_WithSubsAsync(folderId, cancellationToken);
+        }
+        async Task<FolderDriveStructFile[]> _GetFolders_inFolder_WithSubsAsync(string folderId, CancellationToken cancellationToken)
+        {
+            var RootFolders = await _GetFolders_inFolderAsync(folderId, cancellationToken);
+            foreach (var folder in RootFolders)
+            {
+
+                folder.Folders.AddRange(await _GetFolders_inFolder_WithSubsAsync(folder.DriveFileId, cancellationToken));
+            }
+            return RootFolders;
+        }
+
+
+        //GetFiles in Folder
+        public Task<FileDriveStructFile[]> GetFiles_inFolderAsync(string folderId, CancellationToken cancellationToken)
+        {
+            return _GetFiles_inFolderAsync(folderId, cancellationToken);
+        }
+        public Task<FileDriveStructFile[]> GetFiles_inFolderAsync(string folderId)
+        {
+            return _GetFiles_inFolderAsync(folderId, CancellationToken.None);
+        }
+        async Task<FileDriveStructFile[]> _GetFiles_inFolderAsync(string folderId, CancellationToken cancellationToken)
+        {
+            var temp_list = new List<FileDriveStructFile>();
+            var dFils = await _apiCtrl.Get_Files_InParentAsync(folderId, cancellationToken);
+            if (dFils.Length > 0)
+            {
+                temp_list.AddRange(
+                    dFils.Select(b => new FileDriveStructFile()
+                    {
+                        DriveFileId = b.Id,
+                        ParentDriveId = folderId,
+                        Name = b.Name,
+                        MimeType = b.MimeType,
+                        DriveSize = (b.Size != null) ? b.Size.Value : 0,
+                        Md5Checksum = b.Md5Checksum,
+                        IsInDrive = true
+                    })
+                    .ToArray());
+            }
+
+            return temp_list.ToArray();
+        }
+
+
+        //
+        public Task<FileDriveStructFile[]> GetAllExistFilesInDriveAsync()
+        {
+            return _GetAllExistFilesInDriveAsync(CancellationToken.None);
+        }
+        public Task<FileDriveStructFile[]> GetAllExistFilesInDriveAsync(CancellationToken cancellationToken)
+        {
+            return _GetAllExistFilesInDriveAsync(cancellationToken);
+        }
+        async Task<FileDriveStructFile[]> _GetAllExistFilesInDriveAsync(CancellationToken cancellationToken)
+        {
+            var temp_list = new List<FileDriveStructFile>();
+            var driveFiles = await _apiCtrl.Get_AllFilesAsync(cancellationToken);
+
+            if (driveFiles == null)
+                throw new ArgumentException();
+
+            foreach (var fil in driveFiles)
+            {
+                temp_list.Add(new FileDriveStructFile
+                {
+                    IsInDrive = true,
+                    DriveFileId = fil.Id,
+                    DriveSize = (fil.Size != null) ? fil.Size.Value : 0,
+                    Name = fil.Name,
+                    Md5Checksum = fil.Md5Checksum,
+                    MimeType = fil.MimeType,
+                    ParentDriveId = (fil.Parents.Count > 0) ? fil.Parents[0] : null
+                });
+            }
+            return temp_list.ToArray();
+        }
+
+
+        //
+        public Task<FolderDriveStructFile> LoadFolder_asStructAsync(string folderId, bool withSubFolder, bool withFiles, CancellationToken cancellationToken)
+        {
+            return _LoadFolder_asStructAsync(folderId, withSubFolder, withFiles, cancellationToken);
+        }
+        async Task<FolderDriveStructFile> _LoadFolder_asStructAsync(string folderId, bool withSubFolder, bool withFiles, CancellationToken cancellationToken)
+        {
+            var driveFile = await _apiCtrl.GetFolder(folderId, cancellationToken);
+            if (driveFile == null)
+                throw new GoogleDriveApiGeneralException($"Folder({folderId}) not exist in drive.")
+                {
+                    ExceptionType = "FolderExisting"
+                };
+
+            var rootStruct = new FolderDriveStructFile()
+            {
+                DriveFileId = driveFile.Id,
+                ParentDriveId = driveFile.Parents.FirstOrDefault(),
+                Name = driveFile.Name,
+                DriveSize = (driveFile.Size != null)? driveFile.Size.Value : 0,
+                MimeType = driveFile.MimeType,
+                IsInDrive = true
+            };
+
+            if(withSubFolder)
+            {
+                var folders = await _GetFolders_inFolderAsync(folderId, cancellationToken);
+                rootStruct.Folders.AddRange(folders);
+                foreach (var fldr in folders)
+                {
+                    var tempFldrs = await _GetFolders_inFolder_WithSubsAsync(fldr.DriveFileId, cancellationToken);
+                    fldr.Folders.AddRange(tempFldrs);
+                };
+            }
+
+            if(withFiles)
+            {
+                var folders = new FolderDriveStructFile[] { rootStruct }.AllSubFolderStructs(true);
+                foreach(var fldr in folders)
+                {
+                    var files = await _GetFiles_inFolderAsync(fldr.DriveFileId, cancellationToken);
+                    fldr.Files.AddRange(files);
                 }
             }
-            //catch(Google.GoogleApiException ex)
-            //{
-            //    if(ex.Error.ErrorResponseContent.Contains("File not found"))
-            //    {
-            //        resultt = null;
-            //    }
-            //    else
-            //    {
-            //        throw ex;
-            //    }
-            //}
 
-
-            return resultt;
+            return rootStruct;
         }
-
-        /// <summary>
-        /// Create Folder in specify directory.
-        /// </summary>
-        /// <param name="name">new folder name</param>
-        /// <param name="parentsId">parent folder id</param>
-        /// <returns>new folder id</returns>
-        public string CreateFolder(string name, string parentsId = "root")
-        {
-            var fileMet = new Google.Apis.Drive.v3.Data.File()
-            {
-                Name = name,
-                MimeType = "application/vnd.google-apps.folder",
-                Parents = new List<string>() { parentsId },
-            };
-
-            var request = Service.Files.Create(fileMet);
-            request.Fields = "id, name";
-
-            var file = request.Execute();
-
-            return file.Id;
-        }
-
-        /// <summary>
-        /// Create Folder in specify directory.
-        /// </summary>
-        /// <param name="name">new folder name</param>
-        /// <param name="parentsId">parent folder id</param>
-        /// <returns>new folder id</returns>
-        public async Task<string> CreateFolderAsync(string name, string parentsId = "root")
-        {
-            return await Task.Run(() => CreateFolder(name, parentsId));
-        }
-
-        /// <summary>
-        /// Get all folder in specify directory.
-        /// </summary>
-        /// <param name="parentsId">Parent FolderId that its folder will be returned.</param>
-        /// <returns>List of GoogleDriveFilesInfo</returns>
-        public async Task<Google.Apis.Drive.v3.Data.File[]> Get_Folders_InParentAsync(string parentsId = "root")
-        {
-            FilesResource.ListRequest listRequest = Service.Files.List();
-
-            //`'${from.id}' in parents and mimeType =  'application/vnd.google-apps.folder' and trashed = false`
-            listRequest.Q = $"'{parentsId}' in parents and mimeType =  '{Folder_MimeType}' and trashed = false";
-            //listRequest.Fields = "nextPageToken, files(id, name, mimeType, trashed)";
-            listRequest.Fields = "nextPageToken, files(*)";
-            //listRequest.PageSize = 10;
-
-            IList<Google.Apis.Drive.v3.Data.File> folders = (await listRequest.ExecuteAsync()).Files;
-            return folders.ToArray();
-        }
-
-        //public async Task<Google.Apis.Drive.v3.Data.File[]> Update_FolderAsync(string parentsId = "root")
-        //{
-        //    var listRequest = Service.Files.Update();
-
-        //    //`'${from.id}' in parents and mimeType =  'application/vnd.google-apps.folder' and trashed = false`
-        //    listRequest.Q = $"'{parentsId}' in parents and mimeType =  '{Folder_MimeType}' and trashed = false";
-        //    //listRequest.Fields = "nextPageToken, files(id, name, mimeType, trashed)";
-        //    listRequest.Fields = "nextPageToken, files(*)";
-        //    //listRequest.PageSize = 10;
-
-        //    IList<Google.Apis.Drive.v3.Data.File> folders = (await listRequest.ExecuteAsync()).Files;
-        //    return folders.ToArray();
-        //}
-
-
 
         #endregion
 
+        #region Accessing
 
-
-        #region Oprignal Operations
-
-        /// <summary>
-        /// Получает список имен файлов загруженных на Google Drive
-        /// </summary>
-        public void GetFilseGoogleDrive()
+        public Task<bool> AccessServiceAsync()
         {
-            FilesResource.ListRequest listRequest = Service.Files.List();
-            listRequest.Fields = "nextPageToken, files(id, name)";
-            //listRequest.PageSize = 10;
-
-            //Список файлов полученных после запроса на сервер.
-            IList<Google.Apis.Drive.v3.Data.File> files = listRequest.Execute()
-                .Files;
-
-            Console.WriteLine("Files:");
-
-            if (files != null && files.Count > 0)
-            {
-                foreach (var file in files)
-                    Console.WriteLine("{0} ({1})", file.Name, file.Id);
-            }
-            else
-                Console.WriteLine("No files found.");
+            return _AccessServiceAsync(CancellationToken.None);
         }
-
-        /// <summary>
-        /// Создает папку на Google Drive
-        /// </summary>
-        /// <param name="name">Название папки</param>
-        /// <param name="parentsId">
-        /// Id родительской папки.
-        /// По умолчанию значение равно корневой папке на Google Drive 
-        /// </param>
-        /// <returns>Возвращает Id созданной папки</returns>
-        public string CreateDirectoryDrive(string name, string parentsId = "root")
+        public Task<bool> AccessServiceAsync(CancellationToken cancellationToken)
         {
-            var fileMet = new Google.Apis.Drive.v3.Data.File()
-            {
-                Name = name,
-                MimeType = "application/vnd.google-apps.folder",
-                Parents = new List<string>() { parentsId },
-
-
-            };
-
-            var request = Service.Files.Create(fileMet);
-            request.Fields = "id, name";
-
-            var file = request.Execute();
-
-            //Console.WriteLine($"Папка: {file.Name}");
-
-            return file.Id;
+            return _AccessServiceAsync(cancellationToken);
         }
-
-        /// <summary>
-        /// Асинхронная версия метода CreateDirectoryDrive
-        /// </summary>
-        public async Task<string> CreateDirectoryDriveAsync(string name, string parentsId = "root")
+        Task<bool> _AccessServiceAsync(CancellationToken cancellationToken)
         {
-            return await Task.Run(() => CreateDirectoryDrive(name, parentsId));
+            return _apiCtrl.AccessServiceAsync(cancellationToken);
         }
-
-        /// <summary>
-        /// Загружает файл на Google Drive
-        /// </summary>
-        /// <param name="filePact">Путь к файлу</param>
-        /// <param name="mimeType">Тип файла</param>
-        /// <param name="parent">Родительская папка</param>
-        public void UploadFileGoogleDrive(string filePact, string mimeType, string parent)
-        {
-            var fileMetadata = new Google.Apis.Drive.v3.Data.File()
-            {
-                Name = filePact.Split('\\').Last(),
-                MimeType = mimeType,
-                Parents = new List<string>() { parent }
-            };
-
-            FilesResource.CreateMediaUpload request;
-
-            using (var stream = new System.IO.FileStream(filePact, System.IO.FileMode.Open))
-            {
-                request = Service.Files.Create(fileMetadata, stream, mimeType);
-                request.Fields = "id, name, size";
-                request.Upload();
-            }
-
-            try
-            {
-                var file = request.ResponseBody;
-                Console.WriteLine($"\tФайл загружен: {file.Name} \tразмер файла {file.Size / 1024} КБ");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// Асинхронная версия метода UploadFileGoogleDrive
-        /// </summary>
-        public async Task UploadFileGoogleDriveAsync(string filePact, string mimeType, string parent)
-        {
-            await Task.Run(() => UploadFileGoogleDrive(filePact, mimeType, parent));
-        }
-
-        /// <summary>
-        /// Загружает папку на Google Drive 
-        /// </summary>
-        /// <param name="pahtDir">Путь к папке</param>
-        /// <param name="parent">Id родительской папки</param>
-        public async Task UploadDirectoryDriveAsync(string pahtDir, string parent = "root")
-        {
-            string nameDir = pahtDir.Split('\\').Last();
-
-            string idDir = await this.CreateDirectoryDriveAsync(nameDir, parent); ///! await
-
-            FileInfo[] files = null;
-            DirectoryInfo[] directories = null;
-
-            try
-            {
-                files = new DirectoryInfo(pahtDir).GetFiles();
-                directories = new DirectoryInfo(pahtDir).GetDirectories();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-
-            if (files != null)
-            {
-                foreach (var item in files) ///! await
-                    //await this.UploadFileGoogleDriveAsync(item.FullName, MimeMapping.GetMimeMapping(item.FullName), idDir);
-                    await this.UploadFileGoogleDriveAsync(item.FullName, AppMe.MimeTypes.MimeTypeMap.GetMimeType(item.FullName), idDir);
-
-                foreach (var item in directories)
-                    await UploadDirectoryDriveAsync(item.FullName, idDir);
-            }
-        }
-
 
         #endregion
+
 
         #region Dispose
 
         protected override void Dispose_OnFreeOtherManaged()
         {
-            throw new NotImplementedException();
         }
 
         protected override void Dispose_OnFreeUnManaged()
         {
-            //throw new NotImplementedException();
+        }
+
+        ~GoogleDriveAPIService()
+        {
+            Dispose(false);
         }
 
         #endregion

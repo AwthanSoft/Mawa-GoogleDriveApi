@@ -1,12 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Mawa.GoogleDriveApi.Consts
+﻿namespace Mawa.GoogleDriveApi
 {
     public static class GoogleDriveConsts
     {
-        const string Folder_MimeType = "application/vnd.google-apps.folder";
+        public const string Folder_MimeType = "application/vnd.google-apps.folder";
 
     }
 }

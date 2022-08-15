@@ -1,8 +1,37 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>Mawa.GoogleDriveApi</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Apis" Version="1.57.0" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.57.0" />
+    <PackageReference Include="Google.Apis.Core" Version="1.57.0" />
+    <PackageReference Include="Google.Apis.Drive.v3" Version="1.57.0.2746" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\TempDeskTop\proj\MyLibraries\.Net\mawa libs\MawaAppMeProject\00\MawaAppMeSolution\AppMe.NetStandard\AppMe.NetStandard.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Resxes\GoogleDriveAppResource.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>GoogleDriveAppResource.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Resxes\GoogleDriveAppResource.ar.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Resxes\GoogleDriveAppResource.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+      <LastGenOutput>GoogleDriveAppResource.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
 
 </Project>

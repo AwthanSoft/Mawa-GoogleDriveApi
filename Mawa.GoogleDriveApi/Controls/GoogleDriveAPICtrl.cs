@@ -16,22 +16,16 @@ using Mawa.GoogleDriveApi.Helpers;
 
 namespace Mawa.GoogleDriveApi.Controls
 {
-    public interface IGoogleDriveAPIService
+    public interface IGoogleDriveAPICtrl
     {
 
     }
 
-    public class GoogleDriveAPICtrl : AppMe.IDisposableMe.DisposableMeCore, IGoogleDriveAPIService
+    public class GoogleDriveAPICtrl : AppMe.IDisposableMe.DisposableMeCore, IGoogleDriveAPICtrl
     {
-        #region statics
-
-        const string Folder_MimeType = "application/vnd.google-apps.folder";
-
-        #endregion
-
         #region Initial
 
-        readonly GoogleDriveAPIConfig Config;
+        readonly IGoogleDriveApiConfiguration Config;
 
         public string[] Scopes => Config.Scopes;
         public string ApplicationName => Config.ApplicationName;
@@ -51,7 +45,7 @@ namespace Mawa.GoogleDriveApi.Controls
         }
 
         private readonly ObjectLock objectLock;
-        public GoogleDriveAPICtrl(GoogleDriveAPIConfig Config)
+        public GoogleDriveAPICtrl(IGoogleDriveApiConfiguration Config)
         {
             this.Config = Config;
             //service = GetGoogleAPI();
@@ -169,7 +163,7 @@ namespace Mawa.GoogleDriveApi.Controls
                     var ApiKey =  Service.ApiKey;
                     try
                     {
-                        if (await GetServiceAbout() != null)
+                        if (await GetServiceAboutAsync() != null)
                         {
                             resultt = true;
                         }
@@ -196,19 +190,56 @@ namespace Mawa.GoogleDriveApi.Controls
             }
             return resultt;
         }
+        public async Task<bool> AccessServiceAsync(CancellationToken cancellationToken)
+        {
+            bool resultt = false;
+            if (NetConnectionHelper.IsNetConnected())
+            {
+                if (Service != null)
+                {
+                    var ApiKey = Service.ApiKey;
+                    try
+                    {
+                        if (await GetServiceAboutAsync(cancellationToken) != null)
+                        {
+                            resultt = true;
+                        }
+                        else
+                        {
+
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _service = new Lazy<DriveService>(GetGoogleAPI);
+                        throw ex;
+                    }
+
+                }
+                else
+                {
+                    ExceptionsHelper.Exception_ServicesIsNull();
+                }
+            }
+            else
+            {
+                NetConnectionHelper.Exception_NetNoConnected();
+            }
+            return resultt;
+        }
 
         #endregion
 
 
         #region Service Operations Me
 
-        public async Task<Google.Apis.Drive.v3.Data.About> GetServiceAbout()
+        public async Task<Google.Apis.Drive.v3.Data.About> GetServiceAboutAsync(CancellationToken cancellationToken)
         {
             var aboutRequest = Service.About.Get();
             aboutRequest.Fields = "*";//will be heavy for App
             //aboutRequest.Fields = "kind";
 
-            var requestResultt = await aboutRequest.ExecuteAsync();
+            var requestResultt = await aboutRequest.ExecuteAsync(cancellationToken);
             if (requestResultt != null)
             {
 
@@ -219,27 +250,146 @@ namespace Mawa.GoogleDriveApi.Controls
             }
             return requestResultt;
         }
+        public Task<Google.Apis.Drive.v3.Data.About> GetServiceAboutAsync()
+        {
+            return GetServiceAboutAsync(CancellationToken.None);
+        }
 
 
         #endregion
 
 
-
         #region Files Operations Me
 
-        public async Task<Google.Apis.Drive.v3.Data.File[]> Get_Files_InParentAsync(string parentsId = "root")
+        //
+        public async Task<Google.Apis.Drive.v3.Data.File[]> Get_Files_InParentAsync(string parentsId, CancellationToken cancellationToken)
         {
             FilesResource.ListRequest listRequest = Service.Files.List();
 
-            listRequest.Q = $"'{parentsId}' in parents and mimeType !=  '{Folder_MimeType}' and trashed = false";
+            listRequest.Q = $"'{parentsId}' in parents and mimeType !=  '{GoogleDriveConsts.Folder_MimeType}' and trashed = false";
             //listRequest.Fields = "nextPageToken, files(id, name, mimeType, trashed)";
             listRequest.Fields = "nextPageToken, files(*)";
             //listRequest.PageSize = 10;
 
-            IList<Google.Apis.Drive.v3.Data.File> folders = (await listRequest.ExecuteAsync()).Files;
+            IList<Google.Apis.Drive.v3.Data.File> folders = (await listRequest.ExecuteAsync(cancellationToken)).Files;
             return folders.ToArray();
         }
-        
+        public Task<Google.Apis.Drive.v3.Data.File[]> Get_Files_InParentAsync(string parentsId = "root")
+        {
+            return Get_Files_InParentAsync(parentsId, CancellationToken.None);
+        }
+
+
+        //
+        public async Task<Google.Apis.Drive.v3.Data.File[]> Get_AllFilesAsync(CancellationToken cancellationToken)
+        {
+            FilesResource.ListRequest listRequest = Service.Files.List();
+
+            listRequest.Q = $"mimeType !=  '{GoogleDriveConsts.Folder_MimeType}' and trashed = false";
+            listRequest.Fields = "nextPageToken, files(id, size, name, mimeType, md5Checksum, parents)";
+            //listRequest.PageSize = 10;
+
+            IList<Google.Apis.Drive.v3.Data.File> files = (await listRequest.ExecuteAsync(cancellationToken)).Files;
+            return files.ToArray();
+        }
+        public Task<Google.Apis.Drive.v3.Data.File[]> Get_AllFilesAsync()
+        {
+            return Get_AllFilesAsync(CancellationToken.None);
+        }
+
+
+
+        /// <summary>
+        /// Copy an existing file.
+        /// </summary>
+        /// <param name="service">Drive API service instance.</param>
+        /// <param name="originFileId">ID of the origin file to copy.</param>
+        /// <param name="copyTitle">Title of the copy.</param>
+        /// <returns>The copied file, null is returned if an API error occurred</returns>
+        public Task<Google.Apis.Drive.v3.Data.File> CopyFileAsync(String originFileId, String copyTitle, string toFolderId, CancellationToken cancellationToken)
+        {
+            var copiedFile = new Google.Apis.Drive.v3.Data.File();
+            copiedFile.Name = copyTitle;
+            copiedFile.Parents = new List<string>()
+            {
+                toFolderId
+            };
+            return Service.Files.Copy(copiedFile, originFileId).ExecuteAsync(cancellationToken);
+        }
+        public Task<Google.Apis.Drive.v3.Data.File> CopyFileAsync(String originFileId, String copyTitle, string toFolderId)
+        {
+            return CopyFileAsync(originFileId, copyTitle, toFolderId, CancellationToken.None);
+        }
+
+
+        //
+        public async Task<Google.Apis.Drive.v3.Data.File> UploadLargeFileToDriveAsync(
+            string filePact, string mimeType, string parent,
+            Func<bool> IsResumeng_Predicate, Action<Google.Apis.Upload.IUploadProgress> ProgressChanged_Action,
+            CancellationToken cancellationToken)
+        {
+            var fileMetadata = new Google.Apis.Drive.v3.Data.File()
+            {
+                //Name = filePact.Split('\\').Last(),
+                Name = Path.GetFileName(filePact),
+                MimeType = mimeType,
+                Parents = new List<string>() { parent }
+            };
+
+            FilesResource.CreateMediaUpload request;
+
+            bool isResumModel = false;
+            using (var stream = new System.IO.FileStream(filePact, System.IO.FileMode.Open))
+            {
+                request = Service.Files.Create(fileMetadata, stream, mimeType);
+                request.Fields = "id, name, size";
+                request.ProgressChanged += ProgressChanged_Action;
+
+                //request.ChunkSize = 1024;
+
+                while (true)
+                {
+                    try
+                    {
+                        if (isResumModel)
+                        {
+                            await request.ResumeAsync(cancellationToken);
+                            break;
+                        }
+                        else
+                        {
+                            isResumModel = true;
+                            await request.UploadAsync(cancellationToken);
+                            break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        if (IsResumeng_Predicate())
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            throw ex;
+                        }
+                    }
+                }
+
+                request.ProgressChanged -= ProgressChanged_Action;
+                stream.Close();
+            }
+
+            return request.ResponseBody;
+        }
+
+
+
+
+
+
+
+
         public Google.Apis.Drive.v3.Data.File UploadFileToDrive(
             string filePact, string mimeType, string parent)
         {
@@ -295,97 +445,8 @@ namespace Mawa.GoogleDriveApi.Controls
             return request.ResponseBody;
         }
 
-        public async Task<Google.Apis.Drive.v3.Data.File> UploadLargeFileToDriveAsync(
-          string filePact, string mimeType, string parent,
-          Func<bool> IsResumeng_Predicate,
-          Action<Google.Apis.Upload.IUploadProgress> ProgressChanged_Action
-          )
-        {
-            var fileMetadata = new Google.Apis.Drive.v3.Data.File()
-            {
-                Name = filePact.Split('\\').Last(),
-                MimeType = mimeType,
-                Parents = new List<string>() { parent }
-            };
-
-            FilesResource.CreateMediaUpload request;
-
-            bool isResumModel = false;
-            using (var stream = new System.IO.FileStream(filePact, System.IO.FileMode.Open))
-            {
-                request = Service.Files.Create(fileMetadata, stream, mimeType);
-                request.Fields = "id, name, size";
-                request.ProgressChanged += ProgressChanged_Action;
-
-                //request.ChunkSize = 1024;
-
-                while (true)
-                {
-                    try
-                    {
-                        if (isResumModel)
-                        {
-                            await request.ResumeAsync();
-                            break;
-                        }
-                        else
-                        {
-                            isResumModel = true;
-                            await request.UploadAsync();
-                            break;
-                        }
-                    }
-                    catch(Exception ex)
-                    {
-                        if(IsResumeng_Predicate())
-                        {
-                            continue;
-                        }
-                        else
-                        {
-                            throw ex;
-                        }
-                    }
-                }
-                
-                request.ProgressChanged -= ProgressChanged_Action;
-                stream.Close();
-            }
-
-            return request.ResponseBody;
-        }
 
 
-        public async Task<Google.Apis.Drive.v3.Data.File[]> Get_AllFilesAsync()
-        {
-            FilesResource.ListRequest listRequest = Service.Files.List();
-
-            listRequest.Q = $"mimeType !=  '{Folder_MimeType}' and trashed = false";
-            listRequest.Fields = "nextPageToken, files(id, size, name, mimeType, md5Checksum, parents)";
-            //listRequest.PageSize = 10;
-
-            IList<Google.Apis.Drive.v3.Data.File> files = (await listRequest.ExecuteAsync()).Files;
-            return files.ToArray();
-        }
-
-        /// <summary>
-        /// Copy an existing file.
-        /// </summary>
-        /// <param name="service">Drive API service instance.</param>
-        /// <param name="originFileId">ID of the origin file to copy.</param>
-        /// <param name="copyTitle">Title of the copy.</param>
-        /// <returns>The copied file, null is returned if an API error occurred</returns>
-        public async Task<Google.Apis.Drive.v3.Data.File> CopyFileAsync(String originFileId, String copyTitle, string toFolderId)
-        {
-            var copiedFile = new Google.Apis.Drive.v3.Data.File();
-            copiedFile.Name = copyTitle;
-            copiedFile.Parents = new List<string>()
-            {
-                toFolderId
-            };
-
-            return await Service.Files.Copy(copiedFile, originFileId).ExecuteAsync();
-        }
 
 
 
@@ -406,7 +467,7 @@ namespace Mawa.GoogleDriveApi.Controls
         /// <param name="name">Folder Name that need to check</param>
         /// <param name="parentsId">Parent Folder Id that will searched in</param>
         /// <returns>Return Folder Id if exist or null</returns>
-        public async Task<string> IsExist_Folder_InParentAsync(string name, string parentsId = "root")
+        public async Task<string> IsExist_Folder_InParentAsync(string name, string parentsId, CancellationToken cancellationToken)
         {
             string resultt = null;
             FilesResource.ListRequest listRequest = Service.Files.List();
@@ -418,33 +479,26 @@ namespace Mawa.GoogleDriveApi.Controls
             //https://developers.google.com/drive/api/v3/reference/files
             //`'${from.id}' in parents and mimeType =  'application/vnd.google-apps.folder' and trashed = false`
             //listRequest.Q = $"'${parentsId}' in parents and mimeType =  'application/vnd.google-apps.folder' and trashed = false";
-            listRequest.Q = $"'{parentsId}' in parents and mimeType = '{Folder_MimeType}' and trashed = false";
+            listRequest.Q = $"'{parentsId}' in parents and mimeType = '{GoogleDriveConsts.Folder_MimeType}' and trashed = false";
             listRequest.Fields = "nextPageToken, files(id, name)";
             //listRequest.PageSize = 10;
             //try
             {
-                IList<Google.Apis.Drive.v3.Data.File> folders = (await listRequest.ExecuteAsync()).Files;
+                IList<Google.Apis.Drive.v3.Data.File> folders = (await listRequest.ExecuteAsync(cancellationToken)).Files;
                 var folder = folders.Where(b => b.Name.Equals(name)).FirstOrDefault();
                 if (folder != null)
                 {
                     resultt = folder.Id;
                 }
             }
-            //catch(Google.GoogleApiException ex)
-            //{
-            //    if(ex.Error.ErrorResponseContent.Contains("File not found"))
-            //    {
-            //        resultt = null;
-            //    }
-            //    else
-            //    {
-            //        throw ex;
-            //    }
-            //}
-
 
             return resultt;
         }
+        public Task<string> IsExist_Folder_InParentAsync(string name, string parentsId = "root")
+        {
+            return IsExist_Folder_InParentAsync(name, parentsId, CancellationToken.None);
+        }
+
 
         /// <summary>
         /// Create Folder in specify directory.
@@ -452,52 +506,76 @@ namespace Mawa.GoogleDriveApi.Controls
         /// <param name="name">new folder name</param>
         /// <param name="parentsId">parent folder id</param>
         /// <returns>new folder id</returns>
-        public string CreateFolder(string name, string parentsId = "root")
+        public string CreateFolder(string FolderName, string parentsId = "root")
         {
             var fileMet = new Google.Apis.Drive.v3.Data.File()
             {
-                Name = name,
-                MimeType = "application/vnd.google-apps.folder",
+                Name = FolderName,
+                MimeType = GoogleDriveConsts.Folder_MimeType, //"application/vnd.google-apps.folder",
                 Parents = new List<string>() { parentsId },
             };
 
             var request = Service.Files.Create(fileMet);
             request.Fields = "id, name";
-
             var file = request.Execute();
-
             return file.Id;
         }
-
         /// <summary>
         /// Create Folder in specify directory.
         /// </summary>
-        /// <param name="name">new folder name</param>
+        /// <param name="FolderName">new folder name</param>
         /// <param name="parentsId">parent folder id</param>
         /// <returns>new folder id</returns>
-        public async Task<string> CreateFolderAsync(string name, string parentsId = "root")
+        public async Task<string> CreateFolderAsync(string FolderName, string parentsId, CancellationToken cancellationToken)
         {
-            return await Task.Run(() => CreateFolder(name, parentsId));
+            var fileMet = new Google.Apis.Drive.v3.Data.File()
+            {
+                Name = FolderName,
+                MimeType = GoogleDriveConsts.Folder_MimeType, //"application/vnd.google-apps.folder",
+                Parents = new List<string>() { parentsId },
+            };
+
+            var request = Service.Files.Create(fileMet);
+            request.Fields = "id, name";
+            var file = await request.ExecuteAsync(cancellationToken);
+            return file.Id;
         }
+
 
         /// <summary>
         /// Get all folder in specify directory.
         /// </summary>
         /// <param name="parentsId">Parent FolderId that its folder will be returned.</param>
         /// <returns>List of GoogleDriveFilesInfo</returns>
-        public async Task<Google.Apis.Drive.v3.Data.File[]> Get_Folders_InParentAsync(string parentsId = "root")
+        public async Task<Google.Apis.Drive.v3.Data.File[]> Get_Folders_InParentAsync(string parentsId, CancellationToken cancellationToken)
         {
             FilesResource.ListRequest listRequest = Service.Files.List();
 
             //`'${from.id}' in parents and mimeType =  'application/vnd.google-apps.folder' and trashed = false`
-            listRequest.Q = $"'{parentsId}' in parents and mimeType =  '{Folder_MimeType}' and trashed = false";
+            listRequest.Q = $"'{parentsId}' in parents and mimeType = '{GoogleDriveConsts.Folder_MimeType}' and trashed = false";
             //listRequest.Fields = "nextPageToken, files(id, name, mimeType, trashed)";
             listRequest.Fields = "nextPageToken, files(*)";
             //listRequest.PageSize = 10;
 
-            IList<Google.Apis.Drive.v3.Data.File> folders = (await listRequest.ExecuteAsync()).Files;
+            IList<Google.Apis.Drive.v3.Data.File> folders = (await listRequest.ExecuteAsync(cancellationToken)).Files;
             return folders.ToArray();
         }
+        public Task<Google.Apis.Drive.v3.Data.File[]> Get_Folders_InParentAsync(string parentsId = "root")
+        {
+            return Get_Folders_InParentAsync(parentsId, CancellationToken.None);
+        }
+
+
+        public Task<Google.Apis.Drive.v3.Data.File> GetFolder(string FolderId, CancellationToken cancellationToken)
+        {
+            FilesResource.GetRequest request = Service.Files.Get(FolderId);
+            request.Fields = "*";
+            return request.ExecuteAsync(cancellationToken);
+        }
+
+
+
+
 
         //public async Task<Google.Apis.Drive.v3.Data.File[]> Update_FolderAsync(string parentsId = "root")
         //{
@@ -516,7 +594,6 @@ namespace Mawa.GoogleDriveApi.Controls
 
 
         #endregion
-
 
 
         #region Oprignal Operations
@@ -580,7 +657,7 @@ namespace Mawa.GoogleDriveApi.Controls
         /// </summary>
         public async Task<string> CreateDirectoryDriveAsync(string name, string parentsId = "root")
         {
-            return await Task.Run(() => CreateDirectoryDrive(name, parentsId));
+            return await System.Threading.Tasks.Task.Run(() => CreateDirectoryDrive(name, parentsId));
         }
 
         /// <summary>
@@ -621,9 +698,9 @@ namespace Mawa.GoogleDriveApi.Controls
         /// <summary>
         /// Асинхронная версия метода UploadFileGoogleDrive
         /// </summary>
-        public async Task UploadFileGoogleDriveAsync(string filePact, string mimeType, string parent)
+        public async System.Threading.Tasks.Task UploadFileGoogleDriveAsync(string filePact, string mimeType, string parent)
         {
-            await Task.Run(() => UploadFileGoogleDrive(filePact, mimeType, parent));
+            await System.Threading.Tasks.Task.Run(() => UploadFileGoogleDrive(filePact, mimeType, parent));
         }
 
         /// <summary>
@@ -631,7 +708,7 @@ namespace Mawa.GoogleDriveApi.Controls
         /// </summary>
         /// <param name="pahtDir">Путь к папке</param>
         /// <param name="parent">Id родительской папки</param>
-        public async Task UploadDirectoryDriveAsync(string pahtDir, string parent = "root")
+        public async System.Threading.Tasks.Task UploadDirectoryDriveAsync(string pahtDir, string parent = "root")
         {
             string nameDir = pahtDir.Split('\\').Last();
 
