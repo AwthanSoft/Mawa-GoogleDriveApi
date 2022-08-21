@@ -1,9 +1,4 @@
-﻿using Google.Apis.Drive.v3;
-using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Mawa.GoogleDriveApi.Configs
+﻿namespace Mawa.GoogleDriveApi.Configs
 {
     public interface IGoogleDriveApiConfiguration
     {
@@ -33,7 +28,7 @@ namespace Mawa.GoogleDriveApi.Configs
     //    //
     //    readonly string _GoogleApiToken_SavedFullPath;
     //    public string GoogleApiToken_SavedFullPath => _GoogleApiToken_SavedFullPath;
-        
+
 
     //}
 }

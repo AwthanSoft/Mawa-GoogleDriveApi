@@ -15,7 +15,7 @@ using AppMe.DriveFiling.Extensions;
 
 namespace Mawa.GoogleDriveApi.Services
 {
-    public interface IGoogleDriveAPIService
+    public interface IGoogleDriveAPIService : IDisposable
     {
         #region Folders
 
@@ -125,11 +125,10 @@ namespace Mawa.GoogleDriveApi.Services
         private GoogleDriveAPICtrl _apiCtrl => __apiCtrl.Value;
         private void pre_initial_DriveApiService()
         {
-
+            __apiCtrl = new Lazy<GoogleDriveAPICtrl>(() => new GoogleDriveAPICtrl(Config));
         }
 
         #endregion
-
 
         #region Folders 
 
@@ -189,7 +188,6 @@ namespace Mawa.GoogleDriveApi.Services
 
         #endregion
 
-
         #region Files
 
         //
@@ -237,7 +235,6 @@ namespace Mawa.GoogleDriveApi.Services
 
 
         #endregion
-
 
         #region Drive (Folders & Files) Helper
 
@@ -427,7 +424,6 @@ namespace Mawa.GoogleDriveApi.Services
 
         #endregion
 
-
         #region Dispose
 
         protected override void Dispose_OnFreeOtherManaged()
@@ -436,6 +432,14 @@ namespace Mawa.GoogleDriveApi.Services
 
         protected override void Dispose_OnFreeUnManaged()
         {
+            if(__apiCtrl != null)
+            {
+                if (__apiCtrl.IsValueCreated)
+                {
+                    _apiCtrl.Dispose();
+                }
+                __apiCtrl = null;
+            }
         }
 
         ~GoogleDriveAPIService()

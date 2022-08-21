@@ -31,7 +31,7 @@ namespace Mawa.GoogleDriveApi.Controls
         public string ApplicationName => Config.ApplicationName;
 
         private Lazy<DriveService> _service;
-        internal DriveService Service
+        private DriveService Service
         {
             get
             {
@@ -84,7 +84,7 @@ namespace Mawa.GoogleDriveApi.Controls
                     Config.Scopes,
                     "user",
                     CancellationToken.None,
-                    new FileDataStore(Config.GoogleApiToken_SavedFullPath, true)).Result;
+                    new FileDataStore(Path.GetDirectoryName(Config.GoogleApiToken_SavedFullPath), true)).Result;
 
                 //Console.WriteLine("Credential file saved to: " + credPath);
             }
@@ -108,7 +108,7 @@ namespace Mawa.GoogleDriveApi.Controls
                     Config.Scopes,
                     "user",
                     (taskCancellationToken == null)? CancellationToken.None: taskCancellationToken,
-                    new FileDataStore(Config.GoogleApiToken_SavedFullPath, true));
+                    new FileDataStore(Path.GetDirectoryName(Config.GoogleApiToken_SavedFullPath), true));
             }
         }
 
@@ -751,6 +751,12 @@ namespace Mawa.GoogleDriveApi.Controls
         protected override void Dispose_OnFreeUnManaged()
         {
             //throw new NotImplementedException();
+            if(_service.IsValueCreated)
+                Service.Dispose();
+            else
+            {
+                _service = null;
+            }
         }
 
         ~GoogleDriveAPICtrl()
