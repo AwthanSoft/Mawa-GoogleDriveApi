@@ -73,7 +73,7 @@ namespace Mawa.GoogleDriveApi.Controls
         UserCredential _GoogleAuthorize()
         {
             UserCredential credential;
-            using (var stream = new FileStream(Config.GoogleApiCredintial_FullPath, FileMode.Open, FileAccess.Read))
+            using (var stream = new FileStream(Config.GoogleApiApplicationCredintial_FullPath, FileMode.Open, FileAccess.Read))
             {
                 // The file token.json stores the user's access and refresh tokens, and is created
                 // automatically when the authorization flow completes for the first time.
@@ -84,7 +84,7 @@ namespace Mawa.GoogleDriveApi.Controls
                     Config.Scopes,
                     "user",
                     CancellationToken.None,
-                    new FileDataStore(Path.GetDirectoryName(Config.GoogleApiToken_SavedFullPath), true)).Result;
+                    new FileDataStore(Config.GoogleApiToken_SaveFolderPath, true)).Result;
 
                 //Console.WriteLine("Credential file saved to: " + credPath);
             }
@@ -101,14 +101,14 @@ namespace Mawa.GoogleDriveApi.Controls
         }
         Task<UserCredential> _GoogleAuthorizeAsync(CancellationToken taskCancellationToken)
         {
-            using (var stream = new FileStream(Config.GoogleApiCredintial_FullPath, FileMode.Open, FileAccess.Read))
+            using (var stream = new FileStream(Config.GoogleApiApplicationCredintial_FullPath, FileMode.Open, FileAccess.Read))
             {
                 return GoogleWebAuthorizationBroker.AuthorizeAsync(
                     GoogleClientSecrets.FromStream(stream).Secrets,
                     Config.Scopes,
                     "user",
                     (taskCancellationToken == null)? CancellationToken.None: taskCancellationToken,
-                    new FileDataStore(Path.GetDirectoryName(Config.GoogleApiToken_SavedFullPath), true));
+                    new FileDataStore(Config.GoogleApiToken_SaveFolderPath, true));
             }
         }
 
@@ -240,14 +240,15 @@ namespace Mawa.GoogleDriveApi.Controls
             //aboutRequest.Fields = "kind";
 
             var requestResultt = await aboutRequest.ExecuteAsync(cancellationToken);
-            if (requestResultt != null)
-            {
+            //if (requestResultt != null)
+            //{
 
-            }
-            else
-            {
+            //}
+            //else
+            //{
 
-            }
+            //}
+
             return requestResultt;
         }
         public Task<Google.Apis.Drive.v3.Data.About> GetServiceAboutAsync()
@@ -342,7 +343,7 @@ namespace Mawa.GoogleDriveApi.Controls
             using (var stream = new System.IO.FileStream(filePact, System.IO.FileMode.Open))
             {
                 request = Service.Files.Create(fileMetadata, stream, mimeType);
-                request.Fields = "id, name, size";
+                request.Fields = "id, name, size, md5Checksum";
                 request.ProgressChanged += ProgressChanged_Action;
 
                 //request.ChunkSize = 1024;

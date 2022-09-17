@@ -3,6 +3,14 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>Mawa.GoogleDriveApi</RootNamespace>
+    <Copyright>© 2022 AwthanSoft</Copyright>
+    <Authors>AwthanSoft</Authors>
+    <Version>22.9.7</Version>
+    <Product>Mawa GoogleDrive Api</Product>
+    <RepositoryUrl>https://github.com/AwthanSoft/Mawa-GoogleDriveApi</RepositoryUrl>
+    <RepositoryType>github</RepositoryType>
+    <AssemblyVersion>22.9.7.1</AssemblyVersion>
+    <FileVersion>22.9.7.1</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\TempDeskTop\proj\MyLibraries\.Net\mawa libs\MawaAppMeProject\00\MawaAppMeSolution\AppMe.NetStandard\AppMe.NetStandard.csproj" />
+    <ProjectReference Include="..\..\MawaDrivesSolution\Mawa.Drives.Core\Mawa.Drives.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

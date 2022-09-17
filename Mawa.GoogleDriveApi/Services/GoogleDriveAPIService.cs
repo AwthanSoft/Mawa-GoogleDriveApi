@@ -7,41 +7,17 @@ using System.Threading.Tasks;
 using Mawa.GoogleDriveApi.Configs;
 using Mawa.Lock;
 using Mawa.GoogleDriveApi.Controls;
-using AppMe.DriveFiling.Models;
 
 using DriveFile = Google.Apis.Drive.v3.Data.File;
+//using DriveAbout = Google.Apis.Drive.v3.Data.About;
 using Mawa.GoogleDriveApi.Exceptions;
-using AppMe.DriveFiling.Extensions;
+using Mawa.GoogleDriveApi.Models;
+using Mawa.Drives.Files;
 
 namespace Mawa.GoogleDriveApi.Services
 {
-    public interface IGoogleDriveAPIService : IDisposable
+    public interface IGoogleDriveAPIService : IDisposable, Drives.APIs.IDriveApiService<DriveAbout>
     {
-        #region Folders
-
-        /// <summary>
-        /// to check is folder ixist in specify folder.
-        /// </summary>
-        /// <param name="FolderName">Folder Name that need to check</param>
-        /// <param name="parentsId">Parent Folder Id that will searched in</param>
-        /// <returns>Return Folder Id if exist or null</returns>
-        Task<string> IsFolderExist_InParentAsync(string FolderName, string parentsId);
-        Task<string> IsFolderExist_InParentAsync(string FolderName, string parentsId, CancellationToken cancellationToken);
-
-        /// <summary>
-        /// Create Folder in specify directory.
-        /// </summary>
-        /// <param name="FolderName">new folder name</param>
-        /// <param name="parentsId">parent folder id</param>
-        /// <returns>new folder id</returns>
-        Task<string> CreateFolderAsync(string FolderName, string parentsId);
-        Task<string> CreateFolderAsync(string FolderName, string parentsId, CancellationToken cancellationToken);
-
-        Task<DriveFile[]> GetFolders_InParentAsync(string parentsId, CancellationToken cancellationToken);
-        Task<DriveFile[]> GetFolders_InParentAsync(string parentsId);
-
-        #endregion
-
         #region Files
 
         //
@@ -67,32 +43,18 @@ namespace Mawa.GoogleDriveApi.Services
 
         #endregion
 
-        Task<bool> AccessServiceAsync();
-        Task<bool> AccessServiceAsync(CancellationToken cancellationToken);
+        #region Folders
 
-
-        #region Drive (Folders & Files) Helper
-
-        //
-        Task<FolderDriveStructFile[]> GetFolders_inFolderAsync(string folderId, CancellationToken cancellationToken);
-        //Recursion
-        Task<FolderDriveStructFile[]> GetFolders_inFolder_WithSubsAsync(string folderId, CancellationToken cancellationToken);
-
-
-        //GetFiles in Folder
-        Task<FileDriveStructFile[]> GetFiles_inFolderAsync(string folderId, CancellationToken cancellationToken);
-        //Task<FileDriveStructFile[]> GetFiles_inFolderAsync(string folderId);
-
-
-        //
-        Task<FileDriveStructFile[]> GetAllExistFilesInDriveAsync(CancellationToken cancellationToken);
-        //Task<FileDriveStructFile[]> GetAllExistFilesInDriveAsync();
-
-
-        //
-        Task<FolderDriveStructFile> LoadFolder_asStructAsync(string folderId, bool withSubFolder, bool withFiles, CancellationToken cancellationToken);
+        Task<DriveFile[]> GetFolders_InParentAsync(string parentsId, CancellationToken cancellationToken);
+        Task<DriveFile[]> GetFolders_InParentAsync(string parentsId);
 
         #endregion
+
+        #region About Drive
+
+        //Task<IDriveAbout> GetDriveAboutAsync(CancellationToken cancellationToken);
+        #endregion
+
     }
 
     class GoogleDriveAPIService : AppMe.IDisposableMe.DisposableMeCore, IGoogleDriveAPIService
@@ -421,6 +383,51 @@ namespace Mawa.GoogleDriveApi.Services
         {
             return _apiCtrl.AccessServiceAsync(cancellationToken);
         }
+
+        #endregion
+
+        #region About Drive
+
+        public Task<DriveAbout> GetDriveAboutAsync(CancellationToken cancellationToken)
+        {
+            return _GetDriveAboutAsync(cancellationToken);
+        }
+        async Task<DriveAbout> _GetDriveAboutAsync(CancellationToken cancellationToken)
+        {
+            var tt = await _apiCtrl.GetServiceAboutAsync(cancellationToken);
+
+            return new DriveAbout()
+            {
+                User = new DriveUser()
+                {
+                    DisplayName = tt.User.DisplayName,
+                    EmailAddress = tt.User.EmailAddress,
+                    PermissionId = tt.User.PermissionId,
+                    ETag = tt.User.ETag,
+                    Kind = tt.User.Kind,
+                    Me = (tt.User.Me != null) ? tt.User.Me.Value : false,
+                    PhotoLink = tt.User.PhotoLink,
+                    Str = tt.User.ToString()
+                },
+                StorageQuota = new DriveStorageQuota()
+                {
+                    UsageInDrive = tt.StorageQuota.UsageInDrive ?? 0,
+                    UsageInDriveTrash = tt.StorageQuota.UsageInDriveTrash ?? 0,
+                    Limit = tt.StorageQuota.Limit ?? 0,
+                    Usage = tt.StorageQuota.Usage ?? 0,
+                    Str = tt.StorageQuota.ToString(),
+                },
+                AppInstalled = tt.AppInstalled ?? false,
+                ETag = tt.ETag,
+                CanCreateDrives = tt.CanCreateDrives ?? false,
+                CanCreateTeamDrives = tt.CanCreateTeamDrives ?? false,
+                Kind = tt.Kind,
+                Str = tt.ToString(),
+                MaxUploadSize = tt.MaxUploadSize ?? 0,
+                MaxImportSizes = tt.MaxImportSizes.ToDictionary(b => b.Key, b => b.Value ?? 0)
+            };
+        }
+
 
         #endregion
 
