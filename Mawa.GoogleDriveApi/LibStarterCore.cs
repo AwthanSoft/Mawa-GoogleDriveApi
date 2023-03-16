@@ -1,14 +1,14 @@
-﻿using Mawa.GoogleDriveApi.Services;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Mawa.DependencyInjection.Controls;
+using Mawa.GoogleDriveApi.Services;
 
 namespace Mawa.GoogleDriveApi
 {
     public static class LibStarterCore
     {
         #region Hosting
-        public static void ConfigureServices(IServiceCollection services)
+        public static void ConfigureServices(ICollectionServicesControl CollectionServicesCtrl)
         {
-            services.AddSingleton<IGoogleDriveAPIService, GoogleDriveAPIService>();
+            CollectionServicesCtrl.AddSingleton<IGoogleDriveAPIService, GoogleDriveAPIService>();
         }
         #endregion
     }
