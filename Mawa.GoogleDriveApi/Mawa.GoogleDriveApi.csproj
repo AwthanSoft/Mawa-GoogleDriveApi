@@ -3,14 +3,14 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>Mawa.GoogleDriveApi</RootNamespace>
-    <Copyright>© 2022 AwthanSoft</Copyright>
+    <Copyright>© 2022-2023 AwthanSoft</Copyright>
     <Authors>AwthanSoft</Authors>
-    <Version>22.9.7</Version>
+    <Version>23.03.24</Version>
     <Product>Mawa GoogleDrive Api</Product>
     <RepositoryUrl>https://github.com/AwthanSoft/Mawa-GoogleDriveApi</RepositoryUrl>
     <RepositoryType>github</RepositoryType>
-    <AssemblyVersion>22.9.7.1</AssemblyVersion>
-    <FileVersion>22.9.7.1</FileVersion>
+    <AssemblyVersion>23.03.24.0</AssemblyVersion>
+    <FileVersion>23.03.24.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
