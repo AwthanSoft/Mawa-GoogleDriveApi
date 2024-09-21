@@ -1,8 +1,4 @@
-﻿using Google.Apis.Auth.OAuth2;
-using Google.Apis.Drive.v3;
-using Google.Apis.Services;
-using Google.Apis.Util.Store;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,9 +6,15 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using AppMe.Internet;
+
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.Drive.v3;
+using Google.Apis.Services;
+using Google.Apis.Util.Store;
+
 using Mawa.GoogleDriveApi.Configs;
-using Mawa.Lock;
 using Mawa.GoogleDriveApi.Helpers;
+using Mawa.Lock;
 
 namespace Mawa.GoogleDriveApi.Controls
 {
@@ -64,7 +66,7 @@ namespace Mawa.GoogleDriveApi.Controls
         /// 
         public UserCredential GoogleAuthorize()
         {
-            lock(this.objectLock.opening_Lock)
+            lock (this.objectLock.opening_Lock)
             {
                 return _GoogleAuthorize();
             }
@@ -107,7 +109,7 @@ namespace Mawa.GoogleDriveApi.Controls
                     GoogleClientSecrets.FromStream(stream).Secrets,
                     Config.Scopes,
                     "user",
-                    (taskCancellationToken == null)? CancellationToken.None: taskCancellationToken,
+                    (taskCancellationToken == null) ? CancellationToken.None : taskCancellationToken,
                     new FileDataStore(Config.GoogleApiToken_SaveFolderPath, true));
             }
         }
@@ -160,7 +162,7 @@ namespace Mawa.GoogleDriveApi.Controls
             {
                 if (Service != null)
                 {
-                    var ApiKey =  Service.ApiKey;
+                    var ApiKey = Service.ApiKey;
                     try
                     {
                         if (await GetServiceAboutAsync() != null)
@@ -172,12 +174,12 @@ namespace Mawa.GoogleDriveApi.Controls
 
                         }
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         _service = new Lazy<DriveService>(GetGoogleAPI);
                         throw ex;
                     }
-                    
+
                 }
                 else
                 {
@@ -752,7 +754,7 @@ namespace Mawa.GoogleDriveApi.Controls
         protected override void Dispose_OnFreeUnManaged()
         {
             //throw new NotImplementedException();
-            if(_service.IsValueCreated)
+            if (_service.IsValueCreated)
                 Service.Dispose();
             else
             {

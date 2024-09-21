@@ -4,15 +4,15 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Mawa.Drives.Files;
 using Mawa.GoogleDriveApi.Configs;
-using Mawa.Lock;
 using Mawa.GoogleDriveApi.Controls;
-
-using DriveFile = Google.Apis.Drive.v3.Data.File;
 //using DriveAbout = Google.Apis.Drive.v3.Data.About;
 using Mawa.GoogleDriveApi.Exceptions;
 using Mawa.GoogleDriveApi.Models;
-using Mawa.Drives.Files;
+using Mawa.Lock;
+
+using DriveFile = Google.Apis.Drive.v3.Data.File;
 
 namespace Mawa.GoogleDriveApi.Services
 {
@@ -176,8 +176,8 @@ namespace Mawa.GoogleDriveApi.Services
         {
             return _apiCtrl.CopyFileAsync(originFileId, copyTitle, toFolderId, cancellationToken);
         }
-        
-        
+
+
         //
         public Task<DriveFile> UploadLargeFileToDriveAsync(string filePact, string mimeType, string parent,
          Func<bool> IsResumeng_Predicate,
@@ -338,12 +338,12 @@ namespace Mawa.GoogleDriveApi.Services
                 DriveFileId = driveFile.Id,
                 ParentDriveId = driveFile.Parents.FirstOrDefault(),
                 Name = driveFile.Name,
-                DriveSize = (driveFile.Size != null)? driveFile.Size.Value : 0,
+                DriveSize = (driveFile.Size != null) ? driveFile.Size.Value : 0,
                 MimeType = driveFile.MimeType,
                 IsInDrive = true
             };
 
-            if(withSubFolder)
+            if (withSubFolder)
             {
                 var folders = await _GetFolders_inFolderAsync(folderId, cancellationToken);
                 rootStruct.Folders.AddRange(folders);
@@ -354,10 +354,10 @@ namespace Mawa.GoogleDriveApi.Services
                 };
             }
 
-            if(withFiles)
+            if (withFiles)
             {
                 var folders = new FolderDriveStructFile[] { rootStruct }.AllSubFolderStructs(true);
-                foreach(var fldr in folders)
+                foreach (var fldr in folders)
                 {
                     var files = await _GetFiles_inFolderAsync(fldr.DriveFileId, cancellationToken);
                     fldr.Files.AddRange(files);
@@ -439,7 +439,7 @@ namespace Mawa.GoogleDriveApi.Services
 
         protected override void Dispose_OnFreeUnManaged()
         {
-            if(__apiCtrl != null)
+            if (__apiCtrl != null)
             {
                 if (__apiCtrl.IsValueCreated)
                 {

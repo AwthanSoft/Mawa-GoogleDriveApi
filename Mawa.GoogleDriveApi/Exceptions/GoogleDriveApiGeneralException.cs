@@ -1,6 +1,6 @@
-﻿using Mawa.ExceptionsApp.Core;
-using System;
-using System.Text;
+﻿using System;
+
+using Mawa.Exceptions.Core;
 
 namespace Mawa.GoogleDriveApi.Exceptions
 {
